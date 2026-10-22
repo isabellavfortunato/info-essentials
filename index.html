@@ -157,6 +157,9 @@ body{margin:0;-webkit-text-size-adjust:100%}
 .card.new h2{font-size:30px}
 .card form{display:flex;flex-direction:column;gap:10px}
 .danger{color:var(--p3)}
+.etapa .lab{grid-column:1/-1}
+.rmrow{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-family:var(--cond);font-size:17px}
+#addet{margin-top:6px}
 .login{max-width:440px;margin:10vh auto 0;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:32px;display:flex;flex-direction:column;gap:14px}
 .login h1{margin:0;font-family:var(--display);font-weight:700;font-size:40px;line-height:1}
 .login p{margin:0;color:var(--muted)}
@@ -325,6 +328,9 @@ const DAYS=[
 ];
 
 
+/* etapas do produto: parte final, com 3 etapas no mínimo e botão para acrescentar mais */
+P.push("Seu produto");
+DAYS.push({p:4,title:"Etapas do produto",special:"etapas",secs:[]});
 /* ---------- estado ---------- */
 const LS="info-essentials-cadernos-v1";
 let produtos={};          // id -> {nome, criadoEm, ts, v}
@@ -355,7 +361,10 @@ function fieldsOf(d){
 }
 const ALLF=DAYS.map(fieldsOf);
 const filledIn=(vals,id)=>{const v=vals[id];return v===true||(typeof v==="string"&&v.trim()!=="");};
-function prog(i,vals){vals=vals||V;const fs_=ALLF[i];const k=fs_.filter(id=>filledIn(vals,id)).length;return{k,t:fs_.length,p:fs_.length?Math.round(k*100/fs_.length):0};}
+function etCount(vals){const n=parseInt((vals||V)["et.n"],10);return n>=3?n:3;}
+function etFields(vals){const o=[];for(let i=0;i<etCount(vals);i++){o.push("et."+i+".nome");o.push("et."+i+".desc");}return o;}
+let removendo=null;
+function prog(i,vals){vals=vals||V;const fs_=DAYS[i].special?etFields(vals):ALLF[i];const k=fs_.filter(id=>filledIn(vals,id)).length;return{k,t:fs_.length,p:fs_.length?Math.round(k*100/fs_.length):0};}
 function progTotal(vals){let k=0,t=0;DAYS.forEach((_,i)=>{const p=prog(i,vals);k+=p.k;t+=p.t;});return t?Math.round(k*100/t):0;}
 
 /* ---------- rotas ---------- */
@@ -413,12 +422,12 @@ function renderTrail(){
   const el=$("#trail");if(!el)return;el.innerHTML="";
   P.forEach((name,pi)=>{
     const box=document.createElement("div");box.className="pillar";
-    box.innerHTML=`<h2>${pi+1}. ${esc(name)}</h2><ol></ol>`;
+    box.innerHTML=`<h2>${pi<4?(pi+1)+". ":""}${esc(name)}</h2><ol></ol>`;
     const ol=box.querySelector("ol");
     DAYS.forEach((d,di)=>{if(d.p!==pi)return;
       const pr=prog(di);
       const li=document.createElement("li");
-      li.innerHTML=`<button class="daybtn${di===cur?" on":""}${pr.p===100?" done":""}" data-d="${di}" aria-current="${di===cur?"page":"false"}"><span class="n">${di+1}</span><span class="t">${esc(d.title)}</span><span class="pc">${pr.p}%</span></button>`;
+      li.innerHTML=`<button class="daybtn${di===cur?" on":""}${pr.p===100?" done":""}" data-d="${di}" aria-current="${di===cur?"page":"false"}"><span class="n">${d.special?"E":di+1}</span><span class="t">${esc(d.title)}</span><span class="pc">${pr.p}%</span></button>`;
       ol.appendChild(li);});
     el.appendChild(box);
   });
@@ -450,13 +459,28 @@ function renderItem(it){
 }
 function renderDay(){
   const d=DAYS[cur],pr=prog(cur);
-  let h=`<div class="eyebrow">Pilar ${d.p+1} · ${esc(P[d.p])}</div><h2 class="day">Dia ${cur+1}. ${esc(d.title)}</h2><div class="dayprog" id="dayprog">${pr.k} de ${pr.t} itens preenchidos</div>`;
-  d.secs.forEach(sec=>{h+=`<section class="sec"><h3>${esc(sec.h)}</h3>${sec.items.map(renderItem).join("")}</section>`;});
-  h+=`<div class="foot"><button class="btn" id="prev" ${cur===0?"disabled":""}>Dia anterior</button><div class="tools"><button class="btn" id="cpday">Copiar respostas do dia</button><button class="btn" id="cpall">Copiar tudo</button></div><button class="btn primary" id="next" ${cur===DAYS.length-1?"disabled":""}>Próximo dia</button></div><div id="cpwrap"></div>`;
+  let h;
+  if(d.special){
+    const n=etCount(V);
+    h=`<div class="eyebrow">Seu produto</div><h2 class="day">Etapas do produto</h2><div class="dayprog" id="dayprog">${pr.k} de ${pr.t} itens preenchidos</div><p class="note">Descreva as etapas do seu produto, como os dias do desafio ou os módulos do curso. Comece pelas 3 primeiras e acrescente quantas precisar.</p>`;
+    for(let i=0;i<n;i++){
+      const a="et."+i+".nome",b="et."+i+".desc";
+      let rm="";
+      if(i>=3)rm=removendo===i?`<div class="rmrow"><span>Remover a etapa ${i+1} e o que está escrito nela?</span><button class="btn" data-rm-sim="${i}" style="border-color:var(--p3);color:var(--p3)">Remover</button><button class="btn" data-rm-nao>Cancelar</button></div>`:`<div><button class="linkbtn danger" data-rm="${i}">Remover etapa</button></div>`;
+      h+=`<div class="pair etapa"><div class="tag">Etapa ${i+1}</div><label class="lab" for="${a}">Nome da etapa${inp(a)}</label><label class="lab" for="${b}">O que acontece nesta etapa${ta(b,4)}</label>${rm}</div>`;
+    }
+    h+=`<button class="btn" id="addet">+ Acrescentar etapa</button>`;
+  }else{
+    h=`<div class="eyebrow">Pilar ${d.p+1} · ${esc(P[d.p])}</div><h2 class="day">Dia ${cur+1}. ${esc(d.title)}</h2><div class="dayprog" id="dayprog">${pr.k} de ${pr.t} itens preenchidos</div>`;
+    d.secs.forEach(sec=>{h+=`<section class="sec"><h3>${esc(sec.h)}</h3>${sec.items.map(renderItem).join("")}</section>`;});
+  }
+  const prox=DAYS[cur+1]&&DAYS[cur+1].special?"Etapas do produto":"Próximo dia";
+  h+=`<div class="foot"><button class="btn" id="prev" ${cur===0?"disabled":""}>Dia anterior</button><div class="tools"><button class="btn" id="cpday">${d.special?"Copiar as etapas":"Copiar respostas do dia"}</button><button class="btn" id="cpall">Copiar tudo</button></div><button class="btn primary" id="next" ${cur===DAYS.length-1?"disabled":""}>${prox}</button></div><div id="cpwrap"></div>`;
   const sh=$("#sheet");sh.innerHTML=h;
   sh.querySelectorAll("[data-pct]").forEach(updatePie);
   updatePromise();
   $("#prev").onclick=()=>irDia(cur-1);$("#next").onclick=()=>irDia(cur+1);
+  const add=$("#addet");if(add)add.onclick=()=>{const n=etCount(V);V["et.n"]=String(n+1);removendo=null;marcar(atual);renderTrail();renderDay();const el=document.getElementById("et."+n+".nome");if(el){el.focus();el.scrollIntoView({block:"center"});}};
   $("#cpday").onclick=()=>copy(exportDay(cur));
   $("#cpall").onclick=()=>copy(produtos[atual].nome.toUpperCase()+"\n\n"+DAYS.map((_,i)=>exportDay(i)).join("\n\n"));
 }
@@ -550,12 +574,22 @@ document.addEventListener("click",async e=>{
     return;
   }
   if(ds.abrir){irPara(ds.abrir+"/dia1");return;}
+  if(ds.rm){removendo=+ds.rm;renderDay();return;}
+  if("rmNao" in ds){removendo=null;renderDay();return;}
+  if(ds.rmSim){
+    const i=+ds.rmSim,n=etCount(V);
+    for(let j=i;j<n-1;j++){["nome","desc"].forEach(c=>{const v=V["et."+(j+1)+"."+c];if(v===undefined)delete V["et."+j+"."+c];else V["et."+j+"."+c]=v;});}
+    delete V["et."+(n-1)+".nome"];delete V["et."+(n-1)+".desc"];
+    V["et.n"]=String(n-1);removendo=null;marcar(atual);renderTrail();renderDay();return;
+  }
 });
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.dataset&&e.target.dataset.abrir)irPara(e.target.dataset.abrir+"/dia1");});
 
 /* ---------- exportar ---------- */
 function exportDay(i){
-  const d=DAYS[i];const L=[`DIA ${i+1}. ${d.title.toUpperCase()}`];
+  const d=DAYS[i];
+  if(d.special){const E=["ETAPAS DO PRODUTO"];for(let j=0;j<etCount(V);j++){E.push("",`Etapa ${j+1}. ${(V["et."+j+".nome"]||"").trim()}`,(V["et."+j+".desc"]||"").trim()||"(em branco)");}return E.join("\n");}
+  const L=[`DIA ${i+1}. ${d.title.toUpperCase()}`];
   d.secs.forEach(sec=>{L.push("",sec.h);sec.items.forEach(it=>{
     if(it.t==="q")L.push(`${it.text}\n${(V[it.id]||"").trim()||"(em branco)"}`);
     if(it.t==="s")L.push(`[${it.text}]`);
